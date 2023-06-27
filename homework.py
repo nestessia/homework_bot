@@ -4,15 +4,10 @@ from dotenv import load_dotenv
 import requests
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='main.log',
-    filemode='w',
-    format='%(asctime)s, %(levelname)s, %(message)s'
-)
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -34,7 +29,7 @@ HOMEWORK_VERDICTS = {
 def check_tokens():
     """Проверка токенов."""
     variables = [TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRACTICUM_TOKEN]
-    if all(variables) is False:
+    if not all(variables):
         logging.critical('Нет переменных окружения!!!')
         raise ValueError("Отсутствуют переменные окружения")
     return all(variables)
@@ -55,11 +50,13 @@ def get_api_answer(timestamp):
     try:
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params=payload)
-    except Exception:
-        logging.exception('Ошибка при запросе')
+    except Exception as error:
+        logging.exception(f'Ошибка при запросе: {error}')
 
     if response.status_code != 200:
-        raise requests.RequestException("Код статуса не равен 200")
+        raise requests.RequestException(f'Ошибка кода статуса: '
+                                        f'{response.status_code} '
+                                        f'{response.text}.')
     return response.json()
 
 
@@ -68,9 +65,10 @@ def check_response(response):
     try:
         response = response['homeworks']
     except KeyError:
-        raise KeyError('Нет ключа')
-    if type(response) != list:
-        raise TypeError('Данные не в виде списка')
+        raise KeyError('Нет ключа "homeworks"')
+    if not isinstance(response, list):
+        raise TypeError('Данные не в виде списка. Текущий тип данных - '
+                        f'{type(response)}')
     return True
 
 
@@ -82,16 +80,13 @@ def parse_status(homework):
         if section not in homework:
             logging.error(f'Отсутствуют данные {section}')
             raise KeyError(f'Отсутствуют данные {section}')
-
-    status = homework['status']
+    status = homework['status'] 
     homework_name = homework['homework_name']
-    statuses = {}
-    statuses[homework_name] = status
     if status not in HOMEWORK_VERDICTS:
         logging.debug('Финальный проект не проверен')
-        raise KeyError('Статус проверкт финального')
-    verdict = HOMEWORK_VERDICTS[status]
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+        raise KeyError('Такого статуса нет в перечне.')
+    verdict = HOMEWORK_VERDICTS[status] 
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}' 
 
 
 def main():
@@ -103,15 +98,29 @@ def main():
             timestamp = int(time.time())
             response = get_api_answer(timestamp)
             check_response(response)
-            if len(response['homeworks']) != 0:
+            if not response['homeworks']:
                 check_response(response)
                 message = parse_status(response['homeworks'][0])
+                logging.info('Статус финальный проекта не изменен.')
+                send_message(bot, message)
+            else:
+                message = parse_status(response['homeworks'][0])
+                logging.info('Статус финальный проекта изменен.')
                 send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
+            send_message(bot, message)
         time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename='main.log',
+        filemode='w',
+        format='%(asctime)s, %(levelname)s, %(message)s')
+    logger = logging.getLogger(__name__)
+    handler = RotatingFileHandler('main.log', maxBytes=5000000, backupCount=5)
+    logger.addHandler(handler)
     main()
