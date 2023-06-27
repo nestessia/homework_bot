@@ -80,13 +80,13 @@ def parse_status(homework):
         if section not in homework:
             logging.error(f'Отсутствуют данные {section}')
             raise KeyError(f'Отсутствуют данные {section}')
-    status = homework['status'] 
+    status = homework['status']
     homework_name = homework['homework_name']
     if status not in HOMEWORK_VERDICTS:
         logging.debug('Финальный проект не проверен')
         raise KeyError('Такого статуса нет в перечне.')
-    verdict = HOMEWORK_VERDICTS[status] 
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}' 
+    verdict = HOMEWORK_VERDICTS[status]
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
