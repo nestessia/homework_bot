@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 import requests
 import time
 import logging
-from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
@@ -98,14 +97,9 @@ def main():
             timestamp = int(time.time())
             response = get_api_answer(timestamp)
             check_response(response)
-            if not response['homeworks']:
-                check_response(response)
+            if response['homeworks']:
                 message = parse_status(response['homeworks'][0])
-                logging.info('Статус финальный проекта не изменен.')
-                send_message(bot, message)
-            else:
-                message = parse_status(response['homeworks'][0])
-                logging.info('Статус финальный проекта изменен.')
+                logging.debug('Значение не изменилось')
                 send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
@@ -120,7 +114,5 @@ if __name__ == '__main__':
         filename='main.log',
         filemode='w',
         format='%(asctime)s, %(levelname)s, %(message)s')
-    logger = logging.getLogger(__name__)
-    handler = RotatingFileHandler('main.log', maxBytes=5000000, backupCount=5)
-    logger.addHandler(handler)
+    console_handler = logging.StreamHandler()
     main()
